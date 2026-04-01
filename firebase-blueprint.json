@@ -1,0 +1,94 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the trading platform.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique identifier for the user." },
+        "displayName": { "type": "string", "description": "The display name of the user." },
+        "email": { "type": "string", "description": "The email address of the user." },
+        "balance": { "type": "number", "description": "The current cash balance of the user." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "The timestamp when the user was created." }
+      },
+      "required": ["uid", "email", "balance"]
+    },
+    "PortfolioItem": {
+      "title": "Portfolio Item",
+      "description": "A single asset held in a user's portfolio.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique identifier for the user who owns this asset." },
+        "symbol": { "type": "string", "description": "The ticker symbol of the asset." },
+        "quantity": { "type": "number", "description": "The number of units held." },
+        "averagePrice": { "type": "number", "description": "The average purchase price of the asset." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "The timestamp when the portfolio item was last updated." }
+      },
+      "required": ["uid", "symbol", "quantity", "averagePrice"]
+    },
+    "Trade": {
+      "title": "Trade",
+      "description": "A record of a buy or sell transaction.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique identifier for the user who made the trade." },
+        "symbol": { "type": "string", "description": "The ticker symbol of the asset traded." },
+        "type": { "type": "string", "enum": ["buy", "sell"], "description": "The type of trade." },
+        "quantity": { "type": "number", "description": "The number of units traded." },
+        "price": { "type": "number", "description": "The price per unit at the time of the trade." },
+        "timestamp": { "type": "string", "format": "date-time", "description": "The timestamp when the trade occurred." }
+      },
+      "required": ["uid", "symbol", "type", "quantity", "price", "timestamp"]
+    },
+    "Alert": {
+      "title": "Alert",
+      "description": "A user-defined price alert for a stock.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique identifier for the user who created the alert." },
+        "symbol": { "type": "string", "description": "The ticker symbol of the asset." },
+        "threshold": { "type": "number", "description": "The price threshold to trigger the alert." },
+        "direction": { "type": "string", "enum": ["above", "below"], "description": "Trigger when price goes above or below threshold." },
+        "status": { "type": "string", "enum": ["active", "triggered"], "description": "The current status of the alert." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the alert was created." },
+        "triggeredAt": { "type": "string", "format": "date-time", "description": "When the alert was triggered." }
+      },
+      "required": ["uid", "symbol", "threshold", "direction", "status", "createdAt"]
+    },
+    "PaymentMethod": {
+      "title": "PaymentMethod",
+      "description": "A payment method available for deposits.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the payment method (e.g., M-Pesa, Card)." },
+        "type": { "type": "string", "enum": ["card", "mpesa"], "description": "The type of payment method." },
+        "details": { "type": "string", "description": "Instructions or details (e.g., phone number for M-Pesa)." },
+        "isActive": { "type": "boolean", "description": "Whether the payment method is currently active." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the payment method was added." }
+      },
+      "required": ["name", "type", "isActive", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profile and balance."
+    },
+    "/portfolio/{portfolioId}": {
+      "schema": "PortfolioItem",
+      "description": "User's asset holdings."
+    },
+    "/trades/{tradeId}": {
+      "schema": "Trade",
+      "description": "History of trades."
+    },
+    "/alerts/{alertId}": {
+      "schema": "Alert",
+      "description": "User price alerts."
+    },
+    "/payment_methods/{methodId}": {
+      "schema": "PaymentMethod",
+      "description": "Available payment methods."
+    }
+  }
+}

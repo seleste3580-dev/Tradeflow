@@ -1,0 +1,147 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required) - The unique identifier for the user.
+    //   - displayName: string (optional) - The display name of the user.
+    //   - email: string (required) - The email address of the user.
+    //   - balance: number (required) - The current cash balance of the user.
+    //   - createdAt: timestamp (required) - The timestamp when the user was created.
+    //
+    // Collection: portfolio
+    // Document ID: {portfolioId}
+    // Fields:
+    //   - uid: string (required) - The unique identifier for the user who owns this asset.
+    //   - symbol: string (required) - The ticker symbol of the asset.
+    //   - quantity: number (required) - The number of units held.
+    //   - averagePrice: number (required) - The average purchase price of the asset.
+    //   - updatedAt: timestamp (required) - The timestamp when the portfolio item was last updated.
+    //
+    // Collection: trades
+    // Document ID: {tradeId}
+    // Fields:
+    //   - uid: string (required) - The unique identifier for the user who made the trade.
+    //   - symbol: string (required) - The ticker symbol of the asset traded.
+    //   - type: string (required, enum: ["buy", "sell"]) - The type of trade.
+    //   - quantity: number (required) - The number of units traded.
+    //   - price: number (required) - The price per unit at the time of the trade.
+    //   - timestamp: timestamp (required) - The timestamp when the trade occurred.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          (request.auth.token.email == "waithaka.njoroge3580@gmail.com" && request.auth.token.email_verified == true) ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin')
+        );
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.uid == request.auth.uid &&
+             data.email is string &&
+             data.balance is number && data.balance >= 0;
+    }
+
+    function isValidPortfolioItem(data) {
+      return data.uid == request.auth.uid &&
+             data.symbol is string &&
+             data.quantity is number && data.quantity >= 0;
+    }
+
+    function isValidTrade(data) {
+      return data.uid == request.auth.uid &&
+             data.symbol is string &&
+             data.type in ['buy', 'sell'] &&
+             data.quantity is number && data.quantity > 0 &&
+             data.price is number && data.price > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && isValidUser(request.resource.data) && (!('role' in request.resource.data) || request.resource.data.role == 'user' || isAdmin());
+      allow update: if isOwner(uid) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /portfolio/{portfolioId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidPortfolioItem(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.uid == request.auth.uid && isValidPortfolioItem(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    match /trades/{tradeId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidTrade(request.resource.data);
+      allow update: if false; // Trades are immutable history
+      allow delete: if isAdmin();
+    }
+
+    function isValidAlert(data) {
+      return data.uid == request.auth.uid &&
+             data.symbol is string &&
+             data.threshold is number && data.threshold > 0 &&
+             data.direction in ['above', 'below'] &&
+             data.status in ['active', 'triggered'];
+    }
+
+    match /alerts/{alertId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidAlert(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && isValidAlert(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    function isValidPaymentMethod(data) {
+      return data.name is string &&
+             data.type in ['card', 'mpesa'] &&
+             data.isActive is bool;
+    }
+
+    match /payment_methods/{methodId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin() && isValidPaymentMethod(request.resource.data);
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
